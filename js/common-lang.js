@@ -1,4 +1,11 @@
+
 ArrayHelper = function () { };
+/**
+* 搜索二维数组中某一字段field=值value的行
+* @param arr 二维数组
+* @param field 字段field
+* @param value 值value
+*/
 ArrayHelper.searchField = function (arr, field, value) {
     var i = 0;
     for (i = 0; i < arr.length; i++) {
@@ -8,6 +15,8 @@ ArrayHelper.searchField = function (arr, field, value) {
     }
     return null;
 }
+
+
 String.prototype.trim = function(){
 	if(!$.isFunction(this.replace)) {
 		return null;
