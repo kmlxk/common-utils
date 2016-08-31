@@ -1,4 +1,3 @@
-
 Mx = {
     namespace: function(names) {
         var sep = names.split('.'),
@@ -180,6 +179,11 @@ Mx.array = {
             return ar.slice(0, ar).concat(ar.slice(ar + 1, ar.length));
         }
     },
+    /**
+     * 获取数组中的列
+     * @param {array} ar 字典数组，例如 [{col1:val1},{col1:val2}]
+     * @param {mixed} key 如果不是回调函数则取出所有键名称中的数值，例如[val, val2]，如果是回调函数则调用函数，将函数返回值放入数组返回。
+     * */
     getCols: function(ar, key) {
         var i = 0,
                 len = ar.length,
@@ -207,8 +211,72 @@ Mx.array = {
             }
         }
         return ret;
+    },
+    toTree: function(list, idField, parentField, depthField) {
+        if (typeof depthField === 'undefined') {
+            depthField = 'depth';
+        }
+        var i = 0, len = list.length, item = null, nodeDict = {}, result = {}, parentId = null, root = null, roots = [], parent = null;
+        for (i = 0, len = list.length; i < len; i++) {
+            item = list[i];
+            nodeDict[item[idField]] = item;
+        }
+        for (i = 0, len = list.length; i < len; i++) {
+            item = list[i];
+            item[depthField] = 0;
+            parentId = item[parentField];
+            if (typeof parentId === 'undefined' || parentId == null
+                    // 对于0、-1、空白之类的parent_id，一般就是根节点。
+                    || parentId == '' || parentId == 0 || parentId == -1 ||
+                    // 如果没有找到可能是孤立的节点
+                    typeof nodeDict[parentId] === 'undefined' || nodeDict[parentId] == null) {
+                item[depthField] = 0;
+                root = item;
+                // 有可能有多个根节点
+                roots.push(item);
+                continue;
+            }
+            parent = nodeDict[parentId];
+            if (typeof parent[depthField] == 'undefined' || parent[depthField] == 0) {
+                parent[depthField] = 1;
+            }
+            if (typeof parent.children === 'undefined'
+                    || parent.children == null) {
+                parent.children = [];
+            }
+            item[depthField] = parent[depthField] + 1;
+            parent.children.push(item);
+        }
+        if (roots.length > 1) {
+            // 对于多个根节点的森林，修改返回的根节点
+            return {children: roots, name: ''};
+        }
+        return root;
     }
 };
+
+Mx.namespace('Mx.web');
+Mx.web = {
+    downloadFile: function(url) {
+        var elemIF = document.createElement("iframe");
+        elemIF.src = url;
+        elemIF.style.display = "none";
+        document.body.appendChild(elemIF);
+    }
+};
+Mx.namespace('Mx.dictionary');
+Mx.dictionary = {
+    find: function(kv, value) {
+        for (var prop in kv) {
+            if (kv.hasOwnProperty(prop)) {
+                if (kv[ prop ] === value)
+                    return prop;
+            }
+        }
+        return null;
+    }
+};
+
 Mx.namespace('Mx.form');
 Mx.form = {
     getFieldsValue: function(fields) {
@@ -233,6 +301,84 @@ Mx.form = {
         for (k in kv) {
             $parent.find(tag + '[name=' + k + ']').val(kv[k]);
         }
+    },
+    exportValues: function($parent, submitSelector) {
+        var values = {};
+        if (typeof (submitSelector) == 'undefined') {
+            submitSelector = '.submitvalue';
+        }
+        $parent.find(submitSelector).each(function() {
+            var $input = $(this);
+            values[$input.data('key')] = $input.val();
+        });
+        return values;
+    },
+    importValues: function($parent, values, submitSelector) {
+        if (typeof (submitSelector) == 'undefined') {
+            submitSelector = '.submitvalue';
+        }
+        $parent.find(submitSelector).each(function() {
+            var $input = $(this);
+            var key = $input.data('key');
+            $input.val(values[key]);
+        });
+    },
+    resetValues: function($parent, submitSelector) {
+        if (typeof (submitSelector) == 'undefined') {
+            submitSelector = '.submitvalue';
+        }
+        $parent.find(submitSelector).each(function() {
+            var $input = $(this);
+            $input.val('');
+        });
+    },
+    buildSelectHtml: function(map, defaultText, selected) {
+        if (typeof (selected) == 'undefined') {
+            selected = [];
+        }
+        var html = [];
+        html.push('<option value="">' + defaultText + '</option>');
+        var k = null, attr = null;
+        for (k in map) {
+            attr = typeof selected.findIndex(function(val, index, arr) {
+                return val == k;
+            }) != 'undefined' ? 'selected="selected"' : '';
+            html.push('<option value="' + k + '">' + map[k] + '</option>');
+        }
+        return html.join('');
+    },
+    buildSelectHtmlFromTree: function(tree, defaultText, valueKey, textKey, indentText) {
+        indentText = indentText || '　';
+        valueKey = valueKey || 'id';
+        textKey = textKey || 'text';
+        var html = [];
+        html.push('<option value="">' + defaultText + '</option>');
+        var stack = [tree];
+        var item = null;
+        var whitespace = null;
+        while (stack.length >= 0) {
+            item = stack.pop();
+            if (typeof item == 'undefined' || item == null) {
+                break;
+            }
+            whitespace = (new Array(item.depth)).join(indentText);
+            html.push('<option value="' + item[valueKey] + '">' + whitespace + item[textKey] + '</option>');
+            // 如有子节点则加入
+            if (typeof item.children !== 'undefined') {
+                stack = stack.concat(item.children);
+            }
+        }
+        return html.join('');
+    },
+    buildCheckboxHtml: function(map, attrHtml) {
+        var html = [];
+        var k = null;
+        var id = null;
+        for (k in map) {
+            id = 'chk_auto_' + name + "_" + k;
+            html.push('<input id="' + id + '" type="checkbox" ' + attrHtml + ' value="' + k + '" /><label for="' + id + '">' + map[k] + '</label>');
+        }
+        return html.join('');
     },
     getCheckboxValue: function($items) {
         var i = 0,
@@ -269,39 +415,58 @@ Mx.json.toObject = function(str) {
     return (new Function("return " + str))();
 };
 
-/**
-* jQuery.extend( target [, object1 ] [, objectN... ] )
-*/
-Object.prototype.extend = function () {
-    var target = arguments[0] || {}, i = 1, length = arguments.length, deep = false, options, name, src, copy;
-    if (typeof target === "boolean") {
-        deep = target;
-        target = arguments[1] || {};
-        i = 2;
+Mx.namespace('Mx.browser');
+Mx.browser.alert = function(message) {
+    var domain = window;
+    if (navigator.userAgent.indexOf('OpenWebKitSharp') >= 0) {
+        domain = window.external;
     }
-    if (typeof target !== "object" && typeof target !== "function") {
-        target = {};
+    return domain.alert(message);
+};
+
+// 为IE8增加Function.bind方法
+if (!Function.prototype.bind) {
+    Function.prototype.bind = function(oThis) {
+        if (typeof this !== "function") {
+            throw new TypeError("Function.prototype.bind - what is trying to be bound is not callable");
+        }
+        var aArgs = Array.prototype.slice.call(arguments, 1),
+                fToBind = this,
+                fNOP = function() {
+                },
+                fBound = function() {
+                    return fToBind.apply(this instanceof fNOP && oThis
+                            ? this
+                            : oThis,
+                            aArgs.concat(Array.prototype.slice.call(arguments)));
+                };
+        fNOP.prototype = this.prototype;
+        fBound.prototype = new fNOP();
+        return fBound;
+    };
+}
+
+$(function() {
+    if (false && navigator.userAgent.indexOf('OpenWebKitSharp') >= 0) {
+        window.external.alert(navigator.userAgent);
+        // 在内嵌浏览器中无法使用alert,confirm,prompt,重写这些方法
+        // window.external.alert('内嵌浏览器中无法使用alert,confirm,prompt,重写这些方法');
+        alert = window.external.alert;
+        confirm = window.external.confirm;
+        prompt = window.external.prompt;
     }
-    if (length === i) {
-        target = this;
-        --i;
-    }
-    for (; i < length; i++) {
-        if ((options = arguments[i]) != null) {
-            for (name in options) {
-                src = target[name];
-                copy = options[name];
-                if (target === copy) {
-                    continue;
-                }
-                if (deep && copy && (typeof copy === 'object' || typeof copy === 'array') && !copy.nodeType) {
-                    var clone = src && (typeof src === 'object' || typeof src === 'array') ? src : typeof copy === 'array' ? [] : {};
-                    target[name] = this.extend(deep, clone, copy);
-                } else if (copy !== undefined) {
-                    target[name] = copy;
+});
+
+(function() {
+    if (!Array.prototype.findIndex) {
+        // IE没有实现此方法
+        Array.prototype.findIndex = function(fn) {
+            for (var i = 0, len = this.length; i < len; i++) {
+                if (fn.apply(this, [this[i], i, this])) {
+                    return i;
                 }
             }
+            return -1;
         }
     }
-    return target;
-}
+})();
