@@ -70,6 +70,17 @@ Mx = {
             params[key] = val;
         });
         return params;//返回这个数组.
+    },
+    hashCode: function(str) {
+        var hash = 0;
+        if (str == null || str.length == 0)
+            return hash;
+        for (i = 0; i < str.length; i++) {
+            char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return hash;
     }
 };
 Date.prototype.format = function(format) {
@@ -338,12 +349,17 @@ Mx.form = {
         }
         var html = [];
         html.push('<option value="">' + defaultText + '</option>');
-        var k = null, attr = null;
+        var k = null, attr = null, text = null;
         for (k in map) {
+            if (typeof map[k] == 'object') {
+                text = k;
+            } else {
+                text = map[k];
+            }
             attr = typeof selected.findIndex(function(val, index, arr) {
                 return val == k;
             }) != 'undefined' ? 'selected="selected"' : '';
-            html.push('<option value="' + k + '">' + map[k] + '</option>');
+            html.push('<option value="' + k + '">' + text + '</option>');
         }
         return html.join('');
     },
@@ -422,6 +438,28 @@ Mx.browser.alert = function(message) {
         domain = window.external;
     }
     return domain.alert(message);
+};
+
+Mx.browser.closeWindow = function() {
+    if (navigator.userAgent.indexOf("MSIE") > 0) {
+        if (navigator.userAgent.indexOf("MSIE 6.0") > 0) {
+            window.opener = null;
+            window.close();
+        }
+        else {
+            window.open('', '_top');
+            window.top.close();
+        }
+    }
+    else if (navigator.userAgent.indexOf("Firefox") > 0) {
+        window.location.href = 'about:blank ';
+        //window.history.go(-2);  
+    }
+    else {
+        window.opener = null;
+        window.open('', '_self', '');
+        window.close();
+    }
 };
 
 // 为IE8增加Function.bind方法
