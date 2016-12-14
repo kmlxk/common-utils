@@ -174,6 +174,10 @@ Mx.model.fromString = function(str) {
 Mx.namespace('Mx.array');
 Mx.array = {
     search: function(ar, key, value) {
+        // 在一维数组中查找
+        if (typeof value == 'undefined') {
+            return ar.indexOf(key);
+        }
         var i = 0,
                 len = ar.length;
         for (; i < len; i++) {
@@ -273,6 +277,32 @@ Mx.web = {
         elemIF.src = url;
         elemIF.style.display = "none";
         document.body.appendChild(elemIF);
+    },
+    getQueryString: function(name) {
+        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)"); // 匹配目标参数
+        var result = window.location.search.substr(1).match(reg);  // 对querystring匹配目标参数
+        if (result != null) {
+            return decodeURIComponent(result[2]);
+        } else {
+            return null;
+        }
+    },
+    getQueryParameters: function() {
+        var qs = location.search.substr(1), // 获取url中"?"符后的字串   
+                args = {}, // 保存参数数据的对象
+                items = qs.length ? qs.split("&") : [], // 取得每一个参数项,
+                item = null,
+                len = items.length;
+
+        for (var i = 0; i < len; i++) {
+            item = items[i].split("=");
+            var name = decodeURIComponent(item[0]),
+                    value = decodeURIComponent(item[1]);
+            if (name) {
+                args[name] = value;
+            }
+        }
+        return args;
     }
 };
 Mx.namespace('Mx.dictionary');
@@ -462,27 +492,120 @@ Mx.browser.closeWindow = function() {
     }
 };
 
-// 为IE8增加Function.bind方法
-if (!Function.prototype.bind) {
-    Function.prototype.bind = function(oThis) {
-        if (typeof this !== "function") {
-            throw new TypeError("Function.prototype.bind - what is trying to be bound is not callable");
+
+/**  
+ * each是一个集合迭代函数，它接受一个函数作为参数和一组可选的参数  
+ * 这个迭代函数依次将集合的每一个元素和可选参数用函数进行计算，并将计算得的结果集返回  
+ {%example  
+ <script>  
+ var a = [1,2,3,4].each(function(x){return x > 2 ? x : null});  
+ var b = [1,2,3,4].each(function(x){return x < 0 ? x : null});  
+ alert(a);  
+ alert(b);  
+ </script>  
+ %}  
+ * @param {Function} fn 进行迭代判定的函数  
+ * @param more ... 零个或多个可选的用户自定义参数  
+ * @returns {Array} 结果集，如果没有结果，返回空集  
+ */
+Array.prototype.each = function(fn) {
+    fn = fn || Function.K;
+    var a = [];
+    var args = Array.prototype.slice.call(arguments, 1);
+    for (var i = 0; i < this.length; i++) {
+        var res = fn.apply(this, [this[i], i].concat(args));
+        if (res != null)
+            a.push(res);
+    }
+    return a;
+};
+
+/**  
+ * 得到一个数组不重复的元素集合<br/>  
+ * 唯一化一个数组  
+ * @returns {Array} 由不重复元素构成的数组  
+ */
+Array.prototype.uniquelize = function() {
+    var ra = new Array();
+    for (var i = 0; i < this.length; i++) {
+        if (!ra.contains(this[i])) {
+            ra.push(this[i]);
         }
-        var aArgs = Array.prototype.slice.call(arguments, 1),
-                fToBind = this,
-                fNOP = function() {
-                },
-                fBound = function() {
-                    return fToBind.apply(this instanceof fNOP && oThis
-                            ? this
-                            : oThis,
-                            aArgs.concat(Array.prototype.slice.call(arguments)));
-                };
-        fNOP.prototype = this.prototype;
-        fBound.prototype = new fNOP();
-        return fBound;
-    };
-}
+    }
+    return ra;
+};
+
+/**  
+ * 求两个集合的补集  
+ {%example  
+ <script>  
+ var a = [1,2,3,4];  
+ var b = [3,4,5,6];  
+ alert(Array.complement(a,b));  
+ </script>  
+ %}  
+ * @param {Array} a 集合A  
+ * @param {Array} b 集合B  
+ * @returns {Array} 两个集合的补集  
+ */
+Array.complement = function(a, b) {
+    return Array.minus(Array.union(a, b), Array.intersect(a, b));
+};
+
+/**  
+ * 求两个集合的交集  
+ {%example  
+ <script>  
+ var a = [1,2,3,4];  
+ var b = [3,4,5,6];  
+ alert(Array.intersect(a,b));  
+ </script>  
+ %}  
+ * @param {Array} a 集合A  
+ * @param {Array} b 集合B  
+ * @returns {Array} 两个集合的交集  
+ */
+Array.intersect = function(a, b) {
+    return a.uniquelize().each(function(o) {
+        return b.contains(o) ? o : null
+    });
+};
+
+/**  
+ * 求两个集合的差集  
+ {%example  
+ <script>  
+ var a = [1,2,3,4];  
+ var b = [3,4,5,6];  
+ alert(Array.minus(a,b));  
+ </script>  
+ %}  
+ * @param {Array} a 集合A  
+ * @param {Array} b 集合B  
+ * @returns {Array} 两个集合的差集  
+ */
+Array.minus = function(a, b) {
+    return a.uniquelize().each(function(o) {
+        return b.contains(o) ? null : o
+    });
+};
+
+/**  
+ * 求两个集合的并集  
+ {%example  
+ <script>  
+ var a = [1,2,3,4];  
+ var b = [3,4,5,6];  
+ alert(Array.union(a,b));  
+ </script>  
+ %}  
+ * @param {Array} a 集合A  
+ * @param {Array} b 集合B  
+ * @returns {Array} 两个集合的并集  
+ */
+Array.union = function(a, b) {
+    return a.concat(b).uniquelize();
+};
 
 $(function() {
     if (false && navigator.userAgent.indexOf('OpenWebKitSharp') >= 0) {
@@ -495,7 +618,53 @@ $(function() {
     }
 });
 
+/**
+ * var a = "我喜欢吃{0}，也喜欢吃{1}，但是最喜欢的还是{0},偶尔再买点{2}";
+ * alert(String.format(a, "苹果","香蕉","香梨"));
+ * @returns {String.format.str}
+ */
+String.format = function() {
+    if (arguments.length == 0)
+        return null;
+    var str = arguments[0];
+    for (var i = 1; i < arguments.length; i++) {
+        var re = new RegExp('\\{' + (i - 1) + '\\}', 'gm');
+        str = str.replace(re, arguments[i]);
+    }
+    return str;
+};
+
+// Polyfill
 (function() {
+
+// 为IE8增加Function.bind方法
+    if (!Function.prototype.bind) {
+        Function.prototype.bind = function(oThis) {
+            if (typeof this !== "function") {
+                throw new TypeError("Function.prototype.bind - what is trying to be bound is not callable");
+            }
+            var aArgs = Array.prototype.slice.call(arguments, 1),
+                    fToBind = this,
+                    fNOP = function() {
+                    },
+                    fBound = function() {
+                        return fToBind.apply(this instanceof fNOP && oThis
+                                ? this
+                                : oThis,
+                                aArgs.concat(Array.prototype.slice.call(arguments)));
+                    };
+            fNOP.prototype = this.prototype;
+            fBound.prototype = new fNOP();
+            return fBound;
+        };
+    }
+
+    if (!Array.prototype.contains) {
+        Array.prototype.contains = function(ele) {
+            return (this.indexOf(ele) >= 0);
+        }
+    }
+
     if (!Array.prototype.findIndex) {
         // IE没有实现此方法
         Array.prototype.findIndex = function(fn) {
@@ -507,4 +676,89 @@ $(function() {
             return -1;
         }
     }
+
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/values
+    if (!Object.values) {
+        Object.values = (function() {
+            'use strict';
+            var hasOwnProperty = Object.prototype.hasOwnProperty,
+                    hasDontEnumBug = !({toString: null}).propertyIsEnumerable('toString'),
+                    dontEnums = [
+                        'toString',
+                        'toLocaleString',
+                        'valueOf',
+                        'hasOwnProperty',
+                        'isPrototypeOf',
+                        'propertyIsEnumerable',
+                        'constructor'
+                    ],
+                    dontEnumsLength = dontEnums.length;
+
+            return function(obj) {
+                if (typeof obj !== 'object' && (typeof obj !== 'function' || obj === null)) {
+                    throw new TypeError('Object.keys called on non-object');
+                }
+
+                var result = [], prop, i;
+
+                for (prop in obj) {
+                    if (hasOwnProperty.call(obj, prop)) {
+                        result.push(obj[prop]);
+                    }
+                }
+
+                if (hasDontEnumBug) {
+                    for (i = 0; i < dontEnumsLength; i++) {
+                        if (hasOwnProperty.call(obj, dontEnums[i])) {
+                            result.push(obj[dontEnums[i]]);
+                        }
+                    }
+                }
+                return result;
+            };
+        }());
+    }
+
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys#Compatiblity
+    if (!Object.keys) {
+        Object.keys = (function() {
+            'use strict';
+            var hasOwnProperty = Object.prototype.hasOwnProperty,
+                    hasDontEnumBug = !({toString: null}).propertyIsEnumerable('toString'),
+                    dontEnums = [
+                        'toString',
+                        'toLocaleString',
+                        'valueOf',
+                        'hasOwnProperty',
+                        'isPrototypeOf',
+                        'propertyIsEnumerable',
+                        'constructor'
+                    ],
+                    dontEnumsLength = dontEnums.length;
+
+            return function(obj) {
+                if (typeof obj !== 'object' && (typeof obj !== 'function' || obj === null)) {
+                    throw new TypeError('Object.keys called on non-object');
+                }
+
+                var result = [], prop, i;
+
+                for (prop in obj) {
+                    if (hasOwnProperty.call(obj, prop)) {
+                        result.push(prop);
+                    }
+                }
+
+                if (hasDontEnumBug) {
+                    for (i = 0; i < dontEnumsLength; i++) {
+                        if (hasOwnProperty.call(obj, dontEnums[i])) {
+                            result.push(dontEnums[i]);
+                        }
+                    }
+                }
+                return result;
+            };
+        }());
+    }
 })();
+
