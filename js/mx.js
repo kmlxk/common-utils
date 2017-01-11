@@ -446,6 +446,15 @@ Mx.web = {
             }
         }
         return args;
+    },
+    getCookie: function (objname) {
+        //获取指定名称的cookie的值
+        var arrstr = document.cookie.split("; ");
+        for(var i = 0;i < arrstr.length;i ++){
+            var temp = arrstr[i].split("=");
+            if(temp[0] == objname) return unescape(temp[1]);
+        }
+        return null;
     }
 };
 Mx.namespace('Mx.dictionary');
@@ -485,8 +494,10 @@ Mx.ajax = {
         }
         jQuery.ajax({
             url: url,
+            cache: false,
             type: requestType,
             data: params,
+            timeout: 3000,
             dataType: resultType,
             success: success,
             error: error
